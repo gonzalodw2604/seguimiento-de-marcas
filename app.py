@@ -22,10 +22,9 @@ if "usuario_actual" not in st.session_state:
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- SISTEMA DE AUTENTICACIÓN Y REGISTRO ---
+# --- SISTEMA DE AUTENTICACIÓN ---
 if not st.session_state.autenticado:
     st.title("🏃‍♂️ Acceso al Club de Atletismo")
-    
     try:
         df_usuarios = conn.read(worksheet="Usuarios", ttl=0)
         df_usuarios = df_usuarios.dropna(how="all", subset=["usuario", "contrasena"])
@@ -37,13 +36,11 @@ if not st.session_state.autenticado:
         dict_usuarios = {}
 
     tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Nuevo Registro"])
-    
     with tab_login:
         with st.form("form_login"):
             usuario_login = st.text_input("Usuario").lower().strip()
             pass_login = st.text_input("Contraseña", type="password")
             btn_login = st.form_submit_button("Entrar")
-            
             if btn_login:
                 if usuario_login in dict_usuarios and dict_usuarios[usuario_login] == pass_login:
                     st.session_state.autenticado = True
@@ -51,13 +48,11 @@ if not st.session_state.autenticado:
                     st.rerun() 
                 else:
                     st.error("Usuario o contraseña incorrectos.")
-
     with tab_registro:
         with st.form("form_registro"):
             nuevo_usuario = st.text_input("Elige un nombre de usuario").lower().strip()
             nueva_pass = st.text_input("Elige una contraseña", type="password")
             btn_registro = st.form_submit_button("Crear Cuenta")
-            
             if btn_registro:
                 if nuevo_usuario in dict_usuarios:
                     st.error("Ese usuario ya existe.")
@@ -66,8 +61,6 @@ if not st.session_state.autenticado:
                     df_usuarios_actualizado = pd.concat([df_usuarios, nueva_fila_user], ignore_index=True)
                     conn.update(worksheet="Usuarios", data=df_usuarios_actualizado)
                     st.success("¡Cuenta creada! Ya puedes iniciar sesión.")
-
-# --- PANEL DEL ATLETA ---
 else:
     col_titulo, col_logout = st.columns([4, 1])
     with col_titulo:
@@ -85,8 +78,6 @@ else:
     except:
         df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios", "tipo"])
 
-    if "comentarios" not in df.columns: df["comentarios"] = ""
-    if "tipo" not in df.columns: df["tipo"] = "Entrenamiento"
     df["tipo"] = df["tipo"].fillna("Entrenamiento")
     df["comentarios"] = df["comentarios"].fillna("").astype(str)
 
@@ -97,114 +88,79 @@ else:
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
 
     lista_pruebas = ["100m lisos", "200m lisos", "400m lisos", "800m lisos", "Salto de Longitud", "Triple Salto"]
-    lista_tipos = ["Entrenamiento", "Competición"]
-
-    # --- 1. AÑADIR MARCAS Y OBJETIVOS ---
-    col1, col2 = st.columns(2)
     
+    # --- 1. FORMULARIOS ---
+    col1, col2 = st.columns(2)
     with col1:
-        st.subheader("📝 Nueva Marca")
         with st.form("formulario_marcas", clear_on_submit=True):
             fecha = st.date_input("Fecha", datetime.date.today())
             prueba = st.selectbox("Prueba", lista_pruebas)
             marca = st.number_input("Marca (seg/m)", min_value=0.0, format="%.2f")
-            tipo = st.selectbox("Tipo de actividad", lista_tipos)
+            tipo = st.selectbox("Tipo", ["Entrenamiento", "Competición"])
             comentarios = st.text_input("Sensaciones/Viento")
-            btn_guardar = st.form_submit_button("Guardar Marca")
-            
-            if btn_guardar and marca > 0:
-                nueva_fila = pd.DataFrame([{
-                    "usuario": st.session_state.usuario_actual,
-                    "fecha": fecha.strftime("%Y-%m-%d"),
-                    "prueba": prueba,
-                    "marca": marca,
-                    "tipo": tipo,
-                    "comentarios": limpiar_comentarios(comentarios)
-                }])
-                df_actualizado = pd.concat([df, nueva_fila], ignore_index=True)
-                conn.update(worksheet="Hoja 1", data=df_actualizado)
-                st.cache_data.clear() 
-                st.rerun() 
-
+            if st.form_submit_button("Guardar Marca"):
+                nueva_fila = pd.DataFrame([{"usuario": st.session_state.usuario_actual, "fecha": fecha.strftime("%Y-%m-%d"), "prueba": prueba, "marca": marca, "tipo": tipo, "comentarios": limpiar_comentarios(comentarios)}])
+                conn.update(worksheet="Hoja 1", data=pd.concat([df, nueva_fila], ignore_index=True))
+                st.rerun()
     with col2:
-        st.subheader("🎯 Fijar Objetivo")
         with st.form("formulario_objetivos", clear_on_submit=True):
-            prueba_obj = st.selectbox("Prueba a mejorar", lista_pruebas)
+            prueba_obj = st.selectbox("Prueba", lista_pruebas)
             marca_obj = st.number_input("Tu objetivo (seg/m)", min_value=0.0, format="%.2f")
-            btn_objetivo = st.form_submit_button("Guardar Objetivo")
-            
-            if btn_objetivo and marca_obj > 0:
-                df_resto_obj = df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_obj))]
-                nuevo_obj = pd.DataFrame([{"usuario": st.session_state.usuario_actual, "prueba": prueba_obj, "objetivo": marca_obj}])
-                df_obj_actualizado = pd.concat([df_resto_obj, nuevo_obj], ignore_index=True)
-                conn.update(worksheet="Objetivos", data=df_obj_actualizado)
-                st.cache_data.clear()
+            if st.form_submit_button("Guardar Objetivo"):
+                df_resto = df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_obj))]
+                conn.update(worksheet="Objetivos", data=pd.concat([df_resto, pd.DataFrame([{"usuario": st.session_state.usuario_actual, "prueba": prueba_obj, "objetivo": marca_obj}])], ignore_index=True))
                 st.rerun()
 
-    st.divider()
-
-    # --- 2. ANÁLISIS Y LISTADO ---
+    # --- 2. ANÁLISIS ---
     st.subheader("📈 Análisis de Progreso")
     df_usuario = df[df["usuario"] == st.session_state.usuario_actual].copy()
+    prueba_seleccionada = st.selectbox("Selecciona prueba:", lista_pruebas)
+    df_grafico = df_usuario[df_usuario["prueba"] == prueba_seleccionada].sort_values(by="fecha").copy()
+    df_grafico["fecha"] = pd.to_datetime(df_grafico["fecha"])
     
-    if not df_usuario.empty:
-        prueba_seleccionada = st.selectbox("Selecciona prueba a analizar:", df_usuario["prueba"].unique())
-        df_grafico = df_usuario[df_usuario["prueba"] == prueba_seleccionada].sort_values(by="fecha")
-        df_grafico["fecha"] = pd.to_datetime(df_grafico["fecha"])
-        
-        # --- Lógica cálculo y métricas ---
-        es_salto = "Salto" in prueba_seleccionada or "Triple" in prueba_seleccionada
-        mejor_marca = df_grafico["marca"].max() if es_salto else df_grafico["marca"].min()
-        primera_marca = df_grafico.iloc[0]["marca"]
-        delta_val = (mejor_marca - primera_marca) if es_salto else (primera_marca - mejor_marca)
-        
-        meta_actual = None
-        if not df_objetivos.empty:
-            filtro_obj = df_objetivos[(df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada)]
-            if not filtro_obj.empty: meta_actual = filtro_obj.iloc[0]["objetivo"]
+    # Buscar objetivo
+    meta_actual = None
+    filtro_obj = df_objetivos[(df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada)]
+    if not filtro_obj.empty: meta_actual = filtro_obj.iloc[0]["objetivo"]
 
-        # Celebración
-        if meta_actual:
-            if (es_salto and mejor_marca >= meta_actual) or (not es_salto and mejor_marca <= meta_actual):
-                st.balloons()
-                st.success(f"¡ESPECTACULAR! Has superado tu objetivo de {meta_actual}.")
-                if st.button("🎯 Limpiar objetivo y crear uno nuevo"):
-                    df_sin_obj = df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada))]
-                    conn.update(worksheet="Objetivos", data=df_sin_obj)
-                    st.cache_data.clear()
-                    st.rerun()
-
-        # Métricas
-        col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("🏅 Récord Personal", mejor_marca, delta=f"{round(delta_val, 2)}")
-        if meta_actual:
-            distancia_meta = round(abs(mejor_marca - meta_actual), 2)
-            col_m2.metric("🎯 Tu Objetivo", meta_actual)
-            col_m3.metric("⏱️ Objetivo" if not es_salto else "📏 Objetivo", f"{distancia_meta} {'seg' if not es_salto else 'm'}")
-        
-        # Gráfica
-        lineas = alt.Chart(df_grafico).mark_line(point=alt.OverlayMarkDef(filled=True, size=70)).encode(
-            x=alt.X("fecha:T", title="Fecha", axis=alt.Axis(format="%Y-%m-%d")),
+    # --- LÓGICA DE GRÁFICA (SIEMPRE VISIBLE) ---
+    if not df_grafico.empty:
+        # Gráfico con datos
+        chart = alt.Chart(df_grafico).mark_line(point=True).encode(
+            x=alt.X("fecha:T", title="Fecha"),
             y=alt.Y("marca:Q", title="Marca", scale=alt.Scale(zero=False)),
             color="tipo:N", tooltip=["fecha", "marca", "tipo", "comentarios"]
         )
-        if meta_actual:
-            linea_meta = alt.Chart(pd.DataFrame({'objetivo': [meta_actual]})).mark_rule(color='red', strokeDash=[5, 5]).encode(y='objetivo:Q')
-            st.altair_chart(alt.layer(lineas, linea_meta).interactive(), use_container_width=True)
-        else:
-            st.altair_chart(lineas.interactive(), use_container_width=True)
-
-        # Tabla y Borrado
-        st.markdown("### 📋 Tus registros")
-        for index, row in df_usuario.iterrows():
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.write(f"**{row['prueba']}** - {row['marca']} ({row['tipo']}) - *{row['fecha']}*")
-            with col2:
-                if st.button("🗑️ Borrar", key=f"del_{index}"):
-                    df_final = df.drop(index)
-                    conn.update(worksheet="Hoja 1", data=df_final)
-                    st.cache_data.clear()
-                    st.rerun()
+        # Métricas (solo si hay datos)
+        mejor_marca = df_grafico["marca"].max() if ("Salto" in prueba_seleccionada) else df_grafico["marca"].min()
+        st.metric("🏅 Récord Personal", mejor_marca)
+        
+        # Celebración
+        if meta_actual and (("Salto" in prueba_seleccionada and mejor_marca >= meta_actual) or (not "Salto" in prueba_seleccionada and mejor_marca <= meta_actual)):
+            st.balloons()
+            st.success("¡Objetivo superado!")
+            if st.button("Limpiar objetivo"):
+                conn.update(worksheet="Objetivos", data=df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada))])
+                st.rerun()
     else:
-        st.info("No hay marcas registradas.")
+        # Gráfico vacío (placeholder)
+        chart = alt.Chart(pd.DataFrame({'x': [0], 'y': [0]})).mark_line().encode(
+            x=alt.X('x', title="Fecha"), y=alt.Y('y', title="Marca")
+        ).properties(title="Aún no hay marcas registradas")
+
+    # Añadir línea objetivo siempre que exista
+    if meta_actual:
+        rule = alt.Chart(pd.DataFrame({'obj': [meta_actual]})).mark_rule(color='red', strokeDash=[5, 5]).encode(y='obj:Q')
+        st.altair_chart(alt.layer(chart, rule).interactive(), use_container_width=True)
+    else:
+        st.altair_chart(chart.interactive(), use_container_width=True)
+
+    # Listado
+    st.markdown("### 📋 Tus registros")
+    for index, row in df_usuario[df_usuario["prueba"] == prueba_seleccionada].iterrows():
+        col1, col2 = st.columns([4, 1])
+        with col1: st.write(f"**{row['marca']}** - {row['tipo']} ({row['fecha']})")
+        with col2:
+            if st.button("🗑️", key=f"del_{index}"):
+                conn.update(worksheet="Hoja 1", data=df.drop(index))
+                st.rerun()
