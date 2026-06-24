@@ -128,23 +128,20 @@ else:
     if not df_grafico.empty:
         mejor_marca = df_grafico["marca"].max() if es_salto else df_grafico["marca"].min()
 
-    # --- METRICAS (Tarjetas) ---
+    # --- METRICAS ---
     if mejor_marca is not None or meta_actual:
         col_m1, col_m2, col_m3 = st.columns(3)
-        if mejor_marca is not None:
-            col_m1.metric("🏅 Récord Personal", mejor_marca)
+        if mejor_marca is not None: col_m1.metric("🏅 Récord Personal", mejor_marca)
         if meta_actual:
             col_m2.metric("🎯 Tu Objetivo", meta_actual)
             if mejor_marca is not None:
                 distancia = round(abs(mejor_marca - meta_actual), 2)
-                label = "📏 Metros a mejorar" if es_salto else "⏱️ Tiempo a bajar"
-                col_m3.metric(label, f"{distancia} {'m' if es_salto else 'seg'}")
+                col_m3.metric("📏 Metros a mejorar" if es_salto else "⏱️ Tiempo a bajar", f"{distancia} {'m' if es_salto else 'seg'}")
 
-    # --- GRÁFICA (Siempre visible) ---
+    # --- GRÁFICA ---
     if not df_grafico.empty:
         chart = alt.Chart(df_grafico).mark_line(point=True).encode(
-            x=alt.X("fecha:T", title="Fecha"),
-            y=alt.Y("marca:Q", title="Marca", scale=alt.Scale(zero=False)),
+            x=alt.X("fecha:T", title="Fecha"), y=alt.Y("marca:Q", title="Marca", scale=alt.Scale(zero=False)),
             color="tipo:N", tooltip=["fecha", "marca", "tipo", "comentarios"]
         )
     else:
@@ -152,19 +149,34 @@ else:
             x=alt.X('x', title="Fecha"), y=alt.Y('y', title="Marca")
         ).properties(title="Aún no hay marcas registradas")
 
-    # Añadir línea objetivo siempre que exista
     if meta_actual:
         rule = alt.Chart(pd.DataFrame({'obj': [meta_actual]})).mark_rule(color='red', strokeDash=[5, 5]).encode(y='obj:Q')
         st.altair_chart(alt.layer(chart, rule).interactive(), use_container_width=True)
     else:
         st.altair_chart(chart.interactive(), use_container_width=True)
 
-    # Listado
+    # Listado con Editar y Borrar
     st.markdown("### 📋 Tus registros")
     for index, row in df_usuario[df_usuario["prueba"] == prueba_seleccionada].iterrows():
-        col1, col2 = st.columns([4, 1])
-        with col1: st.write(f"**{row['marca']}** - {row['tipo']} ({row['fecha']})")
-        with col2:
+        col_txt, col_edit, col_del = st.columns([4, 1, 1])
+        with col_txt: st.write(f"**{row['marca']}** - {row['tipo']} ({row['fecha']})")
+        
+        with col_edit:
+            with st.popover("✏️"):
+                with st.form(f"edit_{index}"):
+                    new_fecha = st.date_input("Fecha", pd.to_datetime(row['fecha']))
+                    new_marca = st.number_input("Marca", value=float(row['marca']))
+                    new_tipo = st.selectbox("Tipo", ["Entrenamiento", "Competición"], index=["Entrenamiento", "Competición"].index(row['tipo']))
+                    new_com = st.text_input("Comentarios", row['comentarios'])
+                    if st.form_submit_button("Guardar"):
+                        df.at[index, 'fecha'] = new_fecha.strftime("%Y-%m-%d")
+                        df.at[index, 'marca'] = new_marca
+                        df.at[index, 'tipo'] = new_tipo
+                        df.at[index, 'comentarios'] = limpiar_comentarios(new_com)
+                        conn.update(worksheet="Hoja 1", data=df)
+                        st.rerun()
+                        
+        with col_del:
             if st.button("🗑️", key=f"del_{index}"):
                 conn.update(worksheet="Hoja 1", data=df.drop(index))
                 st.rerun()
