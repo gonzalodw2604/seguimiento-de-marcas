@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import altair as alt
 from streamlit_gsheets import GSheetsConnection
 
 # --- ESCUDO ANTI-ERRORES DE EXCEL ---
@@ -187,19 +188,29 @@ else:
                 distancia_meta = round(abs(mejor_marca - meta_actual), 2)
                 col_m2.metric("🎯 Tu Objetivo", meta_actual)
                 
-                # --- CAMBIO DE TEXTO INTELIGENTE AQUÍ ---
                 texto_meta = "📏 Metros a mejorar" if es_salto else "⏱️ Tiempo a bajar"
                 col_m3.metric(texto_meta, f"{distancia_meta} {'m' if es_salto else 'seg'}")
             else:
                 col_m2.info("No has fijado un objetivo para esta prueba.")
 
-            # --- GRÁFICA CON LÍNEA DE OBJETIVO ---
-            df_grafico_listo = df_grafico.set_index("fecha")[["marca"]]
-            
+            # --- GRÁFICA AVANZADA CON PUNTOS SIEMPRE VISIBLES ---
+            df_chart = df_grafico[["fecha", "marca"]].copy()
             if meta_actual:
-                df_grafico_listo["objetivo"] = meta_actual
+                df_chart["objetivo"] = meta_actual
             
-            st.line_chart(df_grafico_listo)
+            # Formateamos los datos para la gráfica profesional
+            df_melted = df_chart.melt("fecha", var_name="Categoría", value_name="Valor")
+            
+            grafica_altair = alt.Chart(df_melted).mark_line(
+                point=alt.OverlayMarkDef(filled=True, size=70, opacity=1) # ¡Aquí está la magia de los puntos visibles!
+            ).encode(
+                x=alt.X("fecha:T", title="Fecha"),
+                y=alt.Y("Valor:Q", title="Marca", scale=alt.Scale(zero=False)),
+                color=alt.Color("Categoría:N", title="Leyenda"),
+                tooltip=["fecha", "Categoría", "Valor"]
+            ).interactive()
+            
+            st.altair_chart(grafica_altair, use_container_width=True)
             
             # --- TABLA SIEMPRE VISIBLE ---
             st.markdown("### 📋 Ver, editar o borrar historial detallado")
