@@ -87,4 +87,17 @@ else:
     # --- LECTURA DE BASES DE DATOS ---
     try:
         df = conn.read(worksheet="Hoja 1", ttl=0)
-        df = df.dropna(how="all", subset=["usuario",
+        df = df.dropna(how="all", subset=["usuario", "fecha", "prueba", "marca"]) 
+    except:
+        df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios"])
+
+    if "comentarios" not in df.columns:
+        df["comentarios"] = ""
+    else:
+        df["comentarios"] = df["comentarios"].fillna("").astype(str)
+
+    try:
+        df_objetivos = conn.read(worksheet="Objetivos", ttl=0)
+        df_objetivos = df_objetivos.dropna(how="all", subset=["usuario", "prueba", "objetivo"])
+    except:
+        df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
