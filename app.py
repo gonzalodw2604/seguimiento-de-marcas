@@ -186,7 +186,10 @@ else:
             if meta_actual:
                 distancia_meta = round(abs(mejor_marca - meta_actual), 2)
                 col_m2.metric("🎯 Tu Objetivo", meta_actual)
-                col_m3.metric("🚀 Distancia a la meta", f"{distancia_meta} {'m' if es_salto else 'seg'}")
+                
+                # --- CAMBIO DE TEXTO INTELIGENTE AQUÍ ---
+                texto_meta = "📏 Metros a mejorar" if es_salto else "⏱️ Tiempo a bajar"
+                col_m3.metric(texto_meta, f"{distancia_meta} {'m' if es_salto else 'seg'}")
             else:
                 col_m2.info("No has fijado un objetivo para esta prueba.")
 
