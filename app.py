@@ -172,17 +172,34 @@ else:
             if es_salto:
                 mejor_marca = df_grafico["marca"].max()
                 primera_marca = df_grafico.iloc[0]["marca"]
-                delta_val = mejor_marca - primera_marca # Positivo = mejora
+                delta_val = mejor_marca - primera_marca 
             else:
                 mejor_marca = df_grafico["marca"].min()
                 primera_marca = df_grafico.iloc[0]["marca"]
-                delta_val = primera_marca - mejor_marca # Positivo = mejora (menos tiempo)
+                delta_val = primera_marca - mejor_marca 
             
             meta_actual = None
             if not df_objetivos.empty:
                 filtro_obj = df_objetivos[(df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada)]
                 if not filtro_obj.empty:
                     meta_actual = filtro_obj.iloc[0]["objetivo"]
+
+            # --- LÓGICA DE CELEBRACIÓN ---
+            se_ha_cumplido = False
+            if meta_actual:
+                if es_salto:
+                    if mejor_marca >= meta_actual: se_ha_cumplido = True
+                else:
+                    if mejor_marca <= meta_actual: se_ha_cumplido = True
+
+            if se_ha_cumplido:
+                st.balloons()
+                st.success(f"¡ESPECTACULAR! Has superado tu objetivo de {meta_actual}. ¡Eres una máquina! 🚀")
+                if st.button("🎯 Limpiar objetivo y crear uno nuevo"):
+                    df_sin_obj = df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada))]
+                    conn.update(worksheet="Objetivos", data=df_sin_obj)
+                    st.cache_data.clear()
+                    st.rerun()
 
             col_m1, col_m2, col_m3 = st.columns(3)
             col_m1.metric("🏅 Récord Personal", mejor_marca, delta=f"{round(delta_val, 2)}")
@@ -193,7 +210,7 @@ else:
                 texto_meta = "📏 Metros a mejorar" if es_salto else "⏱️ Tiempo a bajar"
                 col_m3.metric(texto_meta, f"{distancia_meta} {'m' if es_salto else 'seg'}")
             else:
-                col_m2.info("No has fijado objetivo.")
+                col_m2.info("No hay objetivo activo.")
 
             # --- GRÁFICA PROFESIONAL ---
             lineas = alt.Chart(df_grafico).mark_line(point=alt.OverlayMarkDef(filled=True, size=70, opacity=1)).encode(
