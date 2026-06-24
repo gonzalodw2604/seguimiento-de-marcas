@@ -101,3 +101,130 @@ else:
         df_objetivos = df_objetivos.dropna(how="all", subset=["usuario", "prueba", "objetivo"])
     except:
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
+
+    lista_pruebas = ["100m lisos", "200m lisos", "400m lisos", "800m", "Salto de Longitud", "Triple Salto"]
+
+    # --- 1. AÑADIR MARCAS Y OBJETIVOS ---
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📝 Nueva Marca")
+        with st.form("formulario_marcas", clear_on_submit=True):
+            fecha = st.date_input("Fecha", datetime.date.today())
+            prueba = st.selectbox("Prueba", lista_pruebas)
+            marca = st.number_input("Marca (seg/m)", min_value=0.0, format="%.2f")
+            comentarios = st.text_input("Sensaciones/Viento")
+            btn_guardar = st.form_submit_button("Guardar Marca")
+            
+            if btn_guardar and marca > 0:
+                nueva_fila = pd.DataFrame([{
+                    "usuario": st.session_state.usuario_actual,
+                    "fecha": fecha.strftime("%Y-%m-%d"),
+                    "prueba": prueba,
+                    "marca": marca,
+                    "comentarios": limpiar_comentarios(comentarios)
+                }])
+                df_actualizado = pd.concat([df, nueva_fila], ignore_index=True)
+                conn.update(worksheet="Hoja 1", data=df_actualizado)
+                st.cache_data.clear() 
+                st.success("¡Marca guardada!")
+                st.rerun() 
+
+    with col2:
+        st.subheader("🎯 Fijar Objetivo")
+        with st.form("formulario_objetivos", clear_on_submit=True):
+            prueba_obj = st.selectbox("Prueba a mejorar", lista_pruebas)
+            marca_obj = st.number_input("Tu meta (seg/m)", min_value=0.0, format="%.2f")
+            btn_objetivo = st.form_submit_button("Guardar Meta")
+            
+            if btn_objetivo and marca_obj > 0:
+                df_resto_obj = df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_obj))]
+                nuevo_obj = pd.DataFrame([{"usuario": st.session_state.usuario_actual, "prueba": prueba_obj, "objetivo": marca_obj}])
+                df_obj_actualizado = pd.concat([df_resto_obj, nuevo_obj], ignore_index=True)
+                
+                conn.update(worksheet="Objetivos", data=df_obj_actualizado)
+                st.cache_data.clear()
+                st.success(f"¡Objetivo de {marca_obj} fijado!")
+                st.rerun()
+
+    st.divider()
+
+    # --- 2. VISUALIZACIÓN DE PROGRESO MATEMÁTICO ---
+    st.subheader("📈 Análisis de Progreso")
+
+    if not df.empty:
+        df_usuario = df[df["usuario"] == st.session_state.usuario_actual].copy()
+        
+        if not df_usuario.empty:
+            pruebas_disponibles = df_usuario["prueba"].unique()
+            prueba_seleccionada = st.selectbox("Selecciona la prueba a analizar:", pruebas_disponibles)
+            
+            df_grafico = df_usuario[df_usuario["prueba"] == prueba_seleccionada].sort_values(by="fecha")
+            
+            # --- CÁLCULO DE METRICS ---
+            es_salto = "Salto" in prueba_seleccionada
+            
+            if es_salto:
+                mejor_marca = df_grafico["marca"].max()
+                peor_marca = df_grafico["marca"].min()
+            else:
+                mejor_marca = df_grafico["marca"].min()
+                peor_marca = df_grafico["marca"].max()
+                
+            primera_marca = df_grafico.iloc[0]["marca"] 
+            mejora_total = round(abs(primera_marca - mejor_marca), 2)
+            
+            meta_actual = None
+            if not df_objetivos.empty:
+                filtro_obj = df_objetivos[(df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada)]
+                if not filtro_obj.empty:
+                    meta_actual = filtro_obj.iloc[0]["objetivo"]
+
+            col_m1, col_m2, col_m3 = st.columns(3)
+            col_m1.metric("🏅 Récord Personal", mejor_marca, f"Mejora total: {mejora_total}", delta_color="normal" if es_salto else "inverse")
+            
+            if meta_actual:
+                distancia_meta = round(abs(mejor_marca - meta_actual), 2)
+                col_m2.metric("🎯 Tu Objetivo", meta_actual)
+                col_m3.metric("🚀 Distancia a la meta", f"{distancia_meta} {'m' if es_salto else 'seg'}")
+            else:
+                col_m2.info("No has fijado un objetivo para esta prueba.")
+
+            # --- GRÁFICA CON LÍNEA DE OBJETIVO ---
+            df_grafico_listo = df_grafico.set_index("fecha")[["marca"]]
+            
+            if meta_actual:
+                df_grafico_listo["objetivo"] = meta_actual
+            
+            st.line_chart(df_grafico_listo)
+            
+            # --- TABLA SIEMPRE VISIBLE ---
+            st.markdown("### 📋 Ver, editar o borrar historial detallado")
+            df_otros = df[df["usuario"] != st.session_state.usuario_actual].copy()
+            
+            column_config = {
+                "usuario": None, 
+                "fecha": "Fecha", 
+                "prueba": st.column_config.SelectboxColumn("Prueba", options=lista_pruebas), 
+                "marca": "Marca", 
+                "comentarios": "Comentarios"
+            }
+            
+            df_editado = st.data_editor(
+                df_usuario,
+                use_container_width=True,
+                num_rows="dynamic", hide_index=True,
+                column_config=column_config
+            )
+            if not df_editado.equals(df_usuario):
+                if st.button("💾 Guardar Cambios"):
+                    df_editado["usuario"] = st.session_state.usuario_actual
+                    df_final = pd.concat([df_otros, df_editado], ignore_index=True)
+                    df_final["comentarios"] = df_final["comentarios"].apply(limpiar_comentarios)
+                    conn.update(worksheet="Hoja 1", data=df_final)
+                    st.cache_data.clear()
+                    st.rerun()
+        else:
+            st.info("Aún no has registrado ninguna marca.")
+    else:
+        st.info("La base de datos está vacía.")
