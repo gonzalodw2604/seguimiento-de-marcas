@@ -118,32 +118,36 @@ else:
     df_grafico = df_usuario[df_usuario["prueba"] == prueba_seleccionada].sort_values(by="fecha").copy()
     df_grafico["fecha"] = pd.to_datetime(df_grafico["fecha"])
     
-    # Buscar objetivo
+    es_salto = "Salto" in prueba_seleccionada or "Triple" in prueba_seleccionada
+
+    # Buscar objetivo y mejor marca
     meta_actual = None
+    mejor_marca = None
     filtro_obj = df_objetivos[(df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada)]
     if not filtro_obj.empty: meta_actual = filtro_obj.iloc[0]["objetivo"]
-
-    # --- LÓGICA DE GRÁFICA (SIEMPRE VISIBLE) ---
     if not df_grafico.empty:
-        # Gráfico con datos
+        mejor_marca = df_grafico["marca"].max() if es_salto else df_grafico["marca"].min()
+
+    # --- METRICAS (Tarjetas) ---
+    if mejor_marca is not None or meta_actual:
+        col_m1, col_m2, col_m3 = st.columns(3)
+        if mejor_marca is not None:
+            col_m1.metric("🏅 Récord Personal", mejor_marca)
+        if meta_actual:
+            col_m2.metric("🎯 Tu Objetivo", meta_actual)
+            if mejor_marca is not None:
+                distancia = round(abs(mejor_marca - meta_actual), 2)
+                label = "📏 Metros a mejorar" if es_salto else "⏱️ Tiempo a bajar"
+                col_m3.metric(label, f"{distancia} {'m' if es_salto else 'seg'}")
+
+    # --- GRÁFICA (Siempre visible) ---
+    if not df_grafico.empty:
         chart = alt.Chart(df_grafico).mark_line(point=True).encode(
             x=alt.X("fecha:T", title="Fecha"),
             y=alt.Y("marca:Q", title="Marca", scale=alt.Scale(zero=False)),
             color="tipo:N", tooltip=["fecha", "marca", "tipo", "comentarios"]
         )
-        # Métricas (solo si hay datos)
-        mejor_marca = df_grafico["marca"].max() if ("Salto" in prueba_seleccionada) else df_grafico["marca"].min()
-        st.metric("🏅 Récord Personal", mejor_marca)
-        
-        # Celebración
-        if meta_actual and (("Salto" in prueba_seleccionada and mejor_marca >= meta_actual) or (not "Salto" in prueba_seleccionada and mejor_marca <= meta_actual)):
-            st.balloons()
-            st.success("¡Objetivo superado!")
-            if st.button("Limpiar objetivo"):
-                conn.update(worksheet="Objetivos", data=df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_seleccionada))])
-                st.rerun()
     else:
-        # Gráfico vacío (placeholder)
         chart = alt.Chart(pd.DataFrame({'x': [0], 'y': [0]})).mark_line().encode(
             x=alt.X('x', title="Fecha"), y=alt.Y('y', title="Marca")
         ).properties(title="Aún no hay marcas registradas")
