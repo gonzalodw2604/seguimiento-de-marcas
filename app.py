@@ -42,7 +42,6 @@ if not st.session_state.autenticado:
                 conn.update(worksheet="Usuarios", data=pd.concat([df_usuarios, pd.DataFrame([{"usuario": u, "contrasena": p}])]))
                 st.success("Creado")
 else:
-    # --- PANEL PRINCIPAL ---
     if st.button("Cerrar Sesión"): st.session_state.autenticado = False; st.rerun()
     
     try:
@@ -54,7 +53,7 @@ else:
 
     lista_pruebas = ["100m lisos", "200m lisos", "400m lisos", "800m lisos", "Salto de Longitud", "Triple Salto"]
     
-    # Formularios de inserción
+    # Formularios
     col1, col2 = st.columns(2)
     with col1:
         with st.form("form_m", clear_on_submit=True):
@@ -74,21 +73,20 @@ else:
     st.subheader("📈 Progreso")
     df_u = df[df["usuario"] == st.session_state.usuario_actual].copy()
     p_sel = st.selectbox("Prueba:", lista_pruebas)
-    df_g = df_u[df_u["prueba"] == p_sel].sort_values("fecha")
+    df_g = df_u[df_u["prueba"] == p_sel].sort_values("fecha").copy()
+    df_g["fecha"] = pd.to_datetime(df_g["fecha"])
     
-    # Métricas y Gráfica
     meta = df_objetivos[(df_objetivos["usuario"]==st.session_state.usuario_actual) & (df_objetivos["prueba"]==p_sel)]
     meta_val = meta.iloc[0]["objetivo"] if not meta.empty else None
     
     if not df_g.empty:
         mejor = df_g["marca"].max() if "Salto" in p_sel else df_g["marca"].min()
         st.metric("🏅 Récord Personal", mejor)
-        
         c = alt.Chart(df_g).mark_line(point=True).encode(x="fecha:T", y="marca:Q", color="tipo:N", tooltip=["fecha","marca","tipo","comentarios"])
         if meta_val: st.altair_chart(alt.layer(c, alt.Chart(pd.DataFrame({'o':[meta_val]})).mark_rule(color='red').encode(y='o:Q')).interactive(), use_container_width=True)
         else: st.altair_chart(c.interactive(), use_container_width=True)
 
-    # --- LISTA CON EDICIÓN COMPLETA ---
+    # --- LISTA CON EDICIÓN SEGURA ---
     st.markdown("### 📋 Tus registros")
     for idx, row in df_u[df_u["prueba"] == p_sel].iterrows():
         c1, c2, c3 = st.columns([4, 1, 1])
@@ -101,8 +99,13 @@ else:
                     nm = st.number_input("Marca", value=float(row['marca']))
                     nt = st.selectbox("Tipo", ["Entrenamiento", "Competición"], index=["Entrenamiento", "Competición"].index(row['tipo']))
                     nc = st.text_input("Comentarios", row['comentarios'])
-                    if st.form_submit_button("Guardar Cambios"):
-                        df.loc[idx] = [st.session_state.usuario_actual, nf.strftime("%Y-%m-%d"), np, nm, nc, nt]
+                    if st.form_submit_button("Guardar"):
+                        # --- MODIFICACIÓN SEGURA ---
+                        df.at[idx, 'fecha'] = nf.strftime("%Y-%m-%d")
+                        df.at[idx, 'prueba'] = np
+                        df.at[idx, 'marca'] = nm
+                        df.at[idx, 'tipo'] = nt
+                        df.at[idx, 'comentarios'] = limpiar_comentarios(nc)
                         conn.update(worksheet="Hoja 1", data=df)
                         st.rerun()
         if c3.button("🗑️", key=f"del_{idx}"):
