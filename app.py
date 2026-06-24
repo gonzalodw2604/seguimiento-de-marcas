@@ -92,7 +92,6 @@ else:
     except:
         df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios", "tipo"])
 
-    # Normalización de columnas
     if "comentarios" not in df.columns: df["comentarios"] = ""
     if "tipo" not in df.columns: df["tipo"] = "Entrenamiento"
     df["tipo"] = df["tipo"].fillna("Entrenamiento")
@@ -165,17 +164,19 @@ else:
             prueba_seleccionada = st.selectbox("Selecciona la prueba a analizar:", pruebas_disponibles)
             
             df_grafico = df_usuario[df_usuario["prueba"] == prueba_seleccionada].sort_values(by="fecha")
+            df_grafico["fecha"] = pd.to_datetime(df_grafico["fecha"])
             
             # --- CÁLCULO DE METRICS ---
             es_salto = "Salto" in prueba_seleccionada or "Triple" in prueba_seleccionada
             
             if es_salto:
                 mejor_marca = df_grafico["marca"].max()
+                primera_marca = df_grafico.iloc[0]["marca"]
+                delta_val = mejor_marca - primera_marca # Positivo = mejora
             else:
                 mejor_marca = df_grafico["marca"].min()
-                
-            primera_marca = df_grafico.iloc[0]["marca"] 
-            mejora_total = round(abs(primera_marca - mejor_marca), 2)
+                primera_marca = df_grafico.iloc[0]["marca"]
+                delta_val = primera_marca - mejor_marca # Positivo = mejora (menos tiempo)
             
             meta_actual = None
             if not df_objetivos.empty:
@@ -184,7 +185,7 @@ else:
                     meta_actual = filtro_obj.iloc[0]["objetivo"]
 
             col_m1, col_m2, col_m3 = st.columns(3)
-            col_m1.metric("🏅 Récord Personal", mejor_marca, f"Mejora: {mejora_total}", delta_color="normal" if es_salto else "inverse")
+            col_m1.metric("🏅 Récord Personal", mejor_marca, delta=f"{round(delta_val, 2)}")
             
             if meta_actual:
                 distancia_meta = round(abs(mejor_marca - meta_actual), 2)
@@ -194,22 +195,17 @@ else:
             else:
                 col_m2.info("No has fijado objetivo.")
 
-            # --- GRÁFICA PROFESIONAL CON OBJETIVO ---
-            # 1. Gráfica de líneas principal
+            # --- GRÁFICA PROFESIONAL ---
             lineas = alt.Chart(df_grafico).mark_line(point=alt.OverlayMarkDef(filled=True, size=70, opacity=1)).encode(
-                x=alt.X("fecha:T", title="Fecha"),
+                x=alt.X("fecha:T", title="Fecha", axis=alt.Axis(format="%Y-%m-%d")),
                 y=alt.Y("marca:Q", title="Marca", scale=alt.Scale(zero=False)),
                 color=alt.Color("tipo:N", title="Actividad"),
                 tooltip=["fecha", "marca", "tipo", "comentarios"]
             )
             
-            # 2. Gráfica de línea de objetivo (si existe)
             if meta_actual:
                 objetivo_df = pd.DataFrame({'objetivo': [meta_actual]})
-                linea_meta = alt.Chart(objetivo_df).mark_rule(color='red', strokeDash=[5, 5]).encode(
-                    y='objetivo:Q'
-                )
-                # Capas: unimos la gráfica de datos y la regla del objetivo
+                linea_meta = alt.Chart(objetivo_df).mark_rule(color='red', strokeDash=[5, 5]).encode(y='objetivo:Q')
                 grafica_final = alt.layer(lineas, linea_meta).interactive()
             else:
                 grafica_final = lineas.interactive()
