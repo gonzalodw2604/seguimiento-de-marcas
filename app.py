@@ -49,11 +49,10 @@ else:
     # --- CONEXIÓN A GOOGLE SHEETS ---
     conn = st.connection("gsheets", type=GSheetsConnection)
     
-    # Intentamos leer los datos de la hoja. Si está vacía o hay error, creamos una estructura base.
+    # Leemos la hoja obligando a que busque datos nuevos (ttl=0 desactiva la memoria caché)
     try:
-        # worksheet="Hoja 1" debe coincidir con el nombre de la pestaña de tu Excel en Google
-        df = conn.read(worksheet="Hoja 1", usecols=[0, 1, 2, 3])
-        df = df.dropna(how="all") # Limpiamos filas en blanco
+        df = conn.read(worksheet="Hoja 1", usecols=[0, 1, 2, 3], ttl=0)
+        df = df.dropna(how="all") 
     except:
         df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca"])
 
@@ -76,13 +75,14 @@ else:
                     "marca": marca
                 }])
                 
-                # Unimos los datos antiguos con la nueva marca
                 df_actualizado = pd.concat([df, nueva_fila], ignore_index=True)
                 
-                # Enviamos todo de vuelta a Google Sheets
+                # Enviamos los datos y limpiamos la caché para que el gráfico se dibuje de inmediato
                 conn.update(worksheet="Hoja 1", data=df_actualizado)
+                st.cache_data.clear() 
+                
                 st.success("¡Marca guardada correctamente en Google Sheets!")
-                st.rerun() # Refrescamos para que el gráfico se actualice al instante
+                st.rerun() 
             else:
                 st.warning("Por favor, introduce una marca válida mayor que 0.")
 
@@ -98,13 +98,18 @@ else:
             pruebas_disponibles = df_usuario["prueba"].unique()
             prueba_seleccionada = st.selectbox("Selecciona la prueba para ver el gráfico:", pruebas_disponibles)
             
+            # Filtramos y ordenamos por fecha
             df_grafico = df_usuario[df_usuario["prueba"] == prueba_seleccionada].sort_values(by="fecha")
             
+            # Mostramos la tabla
             st.dataframe(df_grafico[["fecha", "marca"]].reset_index(drop=True), use_container_width=True)
             
+            # Preparamos los datos para que el gráfico entienda que la fecha es el eje X
             df_grafico_listo = df_grafico.set_index("fecha")["marca"]
+            
+            # Y finalmente dibujamos el gráfico
             st.line_chart(df_grafico_listo)
         else:
-            st.info("Aún no has registrado ninguna marca.")
+            st.info("Aún no has registrado ninguna marca para tu usuario.")
     else:
         st.info("La base de datos está vacía. ¡Inaugura el panel!")
