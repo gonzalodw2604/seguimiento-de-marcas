@@ -90,12 +90,13 @@ else:
         df = conn.read(worksheet="Hoja 1", ttl=0)
         df = df.dropna(how="all", subset=["usuario", "fecha", "prueba", "marca"]) 
     except:
-        df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios"])
+        df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios", "tipo"])
 
-    if "comentarios" not in df.columns:
-        df["comentarios"] = ""
-    else:
-        df["comentarios"] = df["comentarios"].fillna("").astype(str)
+    # Normalización de columnas
+    if "comentarios" not in df.columns: df["comentarios"] = ""
+    if "tipo" not in df.columns: df["tipo"] = "Entrenamiento"
+    df["tipo"] = df["tipo"].fillna("Entrenamiento")
+    df["comentarios"] = df["comentarios"].fillna("").astype(str)
 
     try:
         df_objetivos = conn.read(worksheet="Objetivos", ttl=0)
@@ -104,6 +105,7 @@ else:
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
 
     lista_pruebas = ["100m lisos", "200m lisos", "400m lisos", "800m", "Salto de Longitud", "Triple Salto"]
+    lista_tipos = ["Entrenamiento", "Competición"]
 
     # --- 1. AÑADIR MARCAS Y OBJETIVOS ---
     col1, col2 = st.columns(2)
@@ -114,6 +116,7 @@ else:
             fecha = st.date_input("Fecha", datetime.date.today())
             prueba = st.selectbox("Prueba", lista_pruebas)
             marca = st.number_input("Marca (seg/m)", min_value=0.0, format="%.2f")
+            tipo = st.selectbox("Tipo de actividad", lista_tipos)
             comentarios = st.text_input("Sensaciones/Viento")
             btn_guardar = st.form_submit_button("Guardar Marca")
             
@@ -123,6 +126,7 @@ else:
                     "fecha": fecha.strftime("%Y-%m-%d"),
                     "prueba": prueba,
                     "marca": marca,
+                    "tipo": tipo,
                     "comentarios": limpiar_comentarios(comentarios)
                 }])
                 df_actualizado = pd.concat([df, nueva_fila], ignore_index=True)
@@ -165,12 +169,11 @@ else:
             # --- CÁLCULO DE METRICS ---
             es_salto = "Salto" in prueba_seleccionada
             
+            # Buscamos el mejor registro (dando prioridad a competición si existe)
             if es_salto:
                 mejor_marca = df_grafico["marca"].max()
-                peor_marca = df_grafico["marca"].min()
             else:
                 mejor_marca = df_grafico["marca"].min()
-                peor_marca = df_grafico["marca"].max()
                 
             primera_marca = df_grafico.iloc[0]["marca"] 
             mejora_total = round(abs(primera_marca - mejor_marca), 2)
@@ -182,32 +185,24 @@ else:
                     meta_actual = filtro_obj.iloc[0]["objetivo"]
 
             col_m1, col_m2, col_m3 = st.columns(3)
-            col_m1.metric("🏅 Récord Personal", mejor_marca, f"Mejora total: {mejora_total}", delta_color="normal" if es_salto else "inverse")
+            col_m1.metric("🏅 Récord Personal", mejor_marca, f"Mejora: {mejora_total}", delta_color="normal" if es_salto else "inverse")
             
             if meta_actual:
                 distancia_meta = round(abs(mejor_marca - meta_actual), 2)
                 col_m2.metric("🎯 Tu Objetivo", meta_actual)
-                
                 texto_meta = "📏 Metros a mejorar" if es_salto else "⏱️ Tiempo a bajar"
                 col_m3.metric(texto_meta, f"{distancia_meta} {'m' if es_salto else 'seg'}")
             else:
-                col_m2.info("No has fijado un objetivo para esta prueba.")
+                col_m2.info("No has fijado objetivo.")
 
-            # --- GRÁFICA AVANZADA CON PUNTOS SIEMPRE VISIBLES ---
-            df_chart = df_grafico[["fecha", "marca"]].copy()
-            if meta_actual:
-                df_chart["objetivo"] = meta_actual
-            
-            # Formateamos los datos para la gráfica profesional
-            df_melted = df_chart.melt("fecha", var_name="Categoría", value_name="Valor")
-            
-            grafica_altair = alt.Chart(df_melted).mark_line(
-                point=alt.OverlayMarkDef(filled=True, size=70, opacity=1) # ¡Aquí está la magia de los puntos visibles!
+            # --- GRÁFICA CON COLORES DIFERENCIADOS ---
+            grafica_altair = alt.Chart(df_grafico).mark_line(
+                point=alt.OverlayMarkDef(filled=True, size=70, opacity=1)
             ).encode(
                 x=alt.X("fecha:T", title="Fecha"),
-                y=alt.Y("Valor:Q", title="Marca", scale=alt.Scale(zero=False)),
-                color=alt.Color("Categoría:N", title="Leyenda"),
-                tooltip=["fecha", "Categoría", "Valor"]
+                y=alt.Y("marca:Q", title="Marca", scale=alt.Scale(zero=False)),
+                color=alt.Color("tipo:N", title="Actividad"),
+                tooltip=["fecha", "marca", "tipo", "comentarios"]
             ).interactive()
             
             st.altair_chart(grafica_altair, use_container_width=True)
@@ -220,6 +215,7 @@ else:
                 "usuario": None, 
                 "fecha": "Fecha", 
                 "prueba": st.column_config.SelectboxColumn("Prueba", options=lista_pruebas), 
+                "tipo": st.column_config.SelectboxColumn("Tipo", options=lista_tipos),
                 "marca": "Marca", 
                 "comentarios": "Comentarios"
             }
