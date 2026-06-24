@@ -103,7 +103,7 @@ else:
     except:
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
 
-    lista_pruebas = ["100m lisos", "200m lisos", "400m lisos", "800m", "Salto de Longitud", "Triple Salto"]
+    lista_pruebas = ["100m lisos", "200m lisos", "400m lisos", "800m lisos", "Salto de Longitud", "Triple Salto"]
     lista_tipos = ["Entrenamiento", "Competición"]
 
     # --- 1. AÑADIR MARCAS Y OBJETIVOS ---
