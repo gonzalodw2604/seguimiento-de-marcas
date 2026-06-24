@@ -138,8 +138,8 @@ else:
         st.subheader("🎯 Fijar Objetivo")
         with st.form("formulario_objetivos", clear_on_submit=True):
             prueba_obj = st.selectbox("Prueba a mejorar", lista_pruebas)
-            marca_obj = st.number_input("Tu meta (seg/m)", min_value=0.0, format="%.2f")
-            btn_objetivo = st.form_submit_button("Guardar Meta")
+            marca_obj = st.number_input("Tu objetivo (seg/m)", min_value=0.0, format="%.2f")
+            btn_objetivo = st.form_submit_button("Guardar Objetivo")
             
             if btn_objetivo and marca_obj > 0:
                 df_resto_obj = df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == prueba_obj))]
