@@ -154,7 +154,7 @@ else:
 
     st.divider()
 
-    # --- 2. VISUALIZACIÓN DE PROGRESO MATEMÁTICO ---
+    # --- 2. VISUALIZACIÓN DE PROGRESO ---
     st.subheader("📈 Análisis de Progreso")
 
     if not df.empty:
@@ -167,9 +167,8 @@ else:
             df_grafico = df_usuario[df_usuario["prueba"] == prueba_seleccionada].sort_values(by="fecha")
             
             # --- CÁLCULO DE METRICS ---
-            es_salto = "Salto" in prueba_seleccionada
+            es_salto = "Salto" in prueba_seleccionada or "Triple" in prueba_seleccionada
             
-            # Buscamos el mejor registro (dando prioridad a competición si existe)
             if es_salto:
                 mejor_marca = df_grafico["marca"].max()
             else:
@@ -195,17 +194,27 @@ else:
             else:
                 col_m2.info("No has fijado objetivo.")
 
-            # --- GRÁFICA CON COLORES DIFERENCIADOS ---
-            grafica_altair = alt.Chart(df_grafico).mark_line(
-                point=alt.OverlayMarkDef(filled=True, size=70, opacity=1)
-            ).encode(
+            # --- GRÁFICA PROFESIONAL CON OBJETIVO ---
+            # 1. Gráfica de líneas principal
+            lineas = alt.Chart(df_grafico).mark_line(point=alt.OverlayMarkDef(filled=True, size=70, opacity=1)).encode(
                 x=alt.X("fecha:T", title="Fecha"),
                 y=alt.Y("marca:Q", title="Marca", scale=alt.Scale(zero=False)),
                 color=alt.Color("tipo:N", title="Actividad"),
                 tooltip=["fecha", "marca", "tipo", "comentarios"]
-            ).interactive()
+            )
             
-            st.altair_chart(grafica_altair, use_container_width=True)
+            # 2. Gráfica de línea de objetivo (si existe)
+            if meta_actual:
+                objetivo_df = pd.DataFrame({'objetivo': [meta_actual]})
+                linea_meta = alt.Chart(objetivo_df).mark_rule(color='red', strokeDash=[5, 5]).encode(
+                    y='objetivo:Q'
+                )
+                # Capas: unimos la gráfica de datos y la regla del objetivo
+                grafica_final = alt.layer(lineas, linea_meta).interactive()
+            else:
+                grafica_final = lineas.interactive()
+            
+            st.altair_chart(grafica_final, use_container_width=True)
             
             # --- TABLA SIEMPRE VISIBLE ---
             st.markdown("### 📋 Ver, editar o borrar historial detallado")
