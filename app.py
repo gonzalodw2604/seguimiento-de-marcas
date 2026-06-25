@@ -88,7 +88,7 @@ else:
         "🏆 Clasificación", 
         "📅 BalasTeam",
         "🌐 Calendario FAA",
-        "🇪🇸 Ranking RFEA"
+        "🏅 Ranking RFEA"
     ])
     
     # PESTAÑA 1: PERFIL PERSONAL
