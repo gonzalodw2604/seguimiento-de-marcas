@@ -288,21 +288,18 @@ else:
         components.iframe("https://web.faalive.com/Calendar", height=700, scrolling=True)
         st.markdown("👉 *Si no ves el calendario correctamente, [ábrelo en una ventana nueva](https://web.faalive.com/Calendar).*")
 
-    # PESTAÑA 5: RANKING RFEA
+    # PESTAÑA 5: RANKING RFEA (ACTUALIZADA)
     with tab_rfea:
         st.subheader("🇪🇸 Rankings Oficiales de la RFEA")
         st.write("Consulta las marcas oficiales para compararte a nivel autonómico o nacional.")
         
-        # Desplegable para seleccionar la zona
-        opcion_ranking = st.selectbox(
-            "📍 Selecciona el ámbito del ranking:",
-            ["Ranking Andaluz", "Ranking Nacional (España)"]
-        )
+        st.info("ℹ️ La RFEA bloquea por seguridad que su web se vea incrustada en otras aplicaciones. ¡Pero tienes acceso directo desde aquí!")
         
-        # Lógica para cambiar el iframe según el desplegable
-        if opcion_ranking == "Ranking Andaluz":
-            components.iframe("https://atletismorfea.es/federaciones/ranking/and", height=800, scrolling=True)
-            st.markdown("👉 *Si no carga, [haz clic aquí para abrir el Ranking Andaluz en otra pestaña](https://atletismorfea.es/federaciones/ranking/and).*")
-        else:
-            components.iframe("https://atletismorfea.es/ranking", height=800, scrolling=True)
-            st.markdown("👉 *Si no carga, [haz clic aquí para abrir el Ranking Nacional en otra pestaña](https://atletismorfea.es/ranking).*")
+        st.write("Selecciona qué ranking quieres consultar:")
+        
+        # Botones muy visuales que abren en pestaña nueva
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            st.link_button("🟢 Abrir Ranking Andaluz", "https://atletismorfea.es/federaciones/ranking/and", use_container_width=True)
+        with col_btn2:
+            st.link_button("🔴 Abrir Ranking Nacional", "https://atletismorfea.es/ranking", use_container_width=True)
