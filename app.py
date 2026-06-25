@@ -14,7 +14,7 @@ def limpiar_comentarios(texto):
 # Configuración
 st.set_page_config(page_title="Control de Marcas", layout="centered")
 
-# --- ESTADO Y CONEXIÓN ---
+# --- ESTADO AND CONEXIÓN ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_actual" not in st.session_state: st.session_state.usuario_actual = ""
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -134,8 +134,8 @@ else:
                 st.rerun()
 
     with tab_leaderboard:
-        st.subheader("🏆 Ranquin General del Club")
-        p_leader = st.selectbox("Selecciona prueba para ver el ranquin:", lista_pruebas, key="leader_prueba")
+        st.subheader("🏆 Ranking General del Club")
+        p_leader = st.selectbox("Selecciona prueba para ver el ranking:", lista_pruebas, key="leader_prueba")
         
         # Filtrar marcas globales de la prueba seleccionada
         df_p = df[df["prueba"] == p_leader].copy()
