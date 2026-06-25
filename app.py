@@ -56,7 +56,7 @@ else:
         df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios", "tipo"])
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
 
-    # --- LISTA DE PRUEBAS ACTUALIZADA ---
+    # --- LISTA DE PRUEBAS ---
     lista_pruebas = [
         "100m lisos", 
         "200m lisos", 
@@ -87,7 +87,7 @@ else:
                 po, mo = st.selectbox("Prueba", lista_pruebas), st.number_input("Objetivo", format="%.2f")
                 if st.form_submit_button("Guardar Objetivo"):
                     d_r = df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == po))]
-                    conn.update(worksheet="Objetivos", data=pd.concat([d_r, pd.DataFrame([{"usuario": st.session_state.usuario_actual, "prueba": po, "objetivo": mo}])]))
+                    conn.update(worksheet="Objetivos", data=pd.concat([d_r, pd.DataFrame([{"usuario": st.session_state.usuario_actual, "prueba": po, "objective": mo}])]))
                     st.rerun()
 
         # Análisis Personal
@@ -100,7 +100,6 @@ else:
         meta = df_objetivos[(df_objetivos["usuario"]==st.session_state.usuario_actual) & (df_objetivos["prueba"]==p_sel)]
         meta_val = meta.iloc[0]["objetivo"] if not meta.empty else None
         
-        # Lógica para detectar si es un concurso de salto
         es_salto = "Salto" in p_sel or "Triple" in p_sel or "Pértiga" in p_sel
         
         if not df_g.empty:
@@ -156,10 +155,36 @@ else:
             
             # Encontrar el récord personal absoluto de cada atleta único en esa prueba
             if es_salto_leader:
-                # Si es salto, queremos el máximo (la marca más alta)
                 leaderboard = df_p.groupby("usuario")["marca"].max().reset_index()
                 leaderboard = leaderboard.sort_values(by="marca", ascending=False).reset_index(drop=True)
             else:
-                # Si es carrera, queremos el mínimo (el tiempo más bajo)
                 leaderboard = df_p.groupby("usuario")["marca"].min().reset_index()
-                leaderboard = leaderboard.
+                leaderboard = leaderboard.sort_values(by="marca", ascending=True).reset_index(drop=True)
+            
+            # Añadir columna de Posición / Puesto
+            leaderboard.index = leaderboard.index + 1
+            leaderboard.index.name = "Puesto"
+            
+            # Embellecer nombres de columnas y visualización
+            leaderboard.columns = ["Atleta", "Mejor Marca"]
+            leaderboard["Atleta"] = leaderboard["Atleta"].str.capitalize()
+            
+            # Dar formato de unidad (m o seg)
+            unidad = "m" if es_salto_leader else "seg"
+            leaderboard["Mejor Marca"] = leaderboard["Mejor Marca"].apply(lambda x: f"{x:.2f} {unidad}")
+            
+            # Emojis especiales para el podio
+            def asignar_medalla(pos):
+                if pos == 1: return "🥇"
+                elif pos == 2: return "🥈"
+                elif pos == 3: return "🥉"
+                return f"{pos}º"
+            
+            leaderboard_display = leaderboard.copy()
+            leaderboard_display["Puesto"] = [asignar_medalla(i) for i in leaderboard_display.index]
+            leaderboard_display = leaderboard_display.set_index("Puesto")
+            
+            # Mostrar la tabla elegante
+            st.dataframe(leaderboard_display, use_container_width=True)
+        else:
+            st.info("Ningún atleta ha registrado marcas en esta prueba todavía.")
