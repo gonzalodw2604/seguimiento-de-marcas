@@ -52,7 +52,7 @@ if "usuario_actual" not in st.session_state: st.session_state.usuario_actual = "
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- AUTENTICACIÓN ---
-if not st.session_state.autenticado:
+
     # --- AUTENTICACIÓN REFORZADA ---
 if not st.session_state.autenticado:
     st.title("🏃‍♂️ Acceso al Club")
