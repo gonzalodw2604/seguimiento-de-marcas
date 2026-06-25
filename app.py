@@ -290,7 +290,7 @@ else:
 
     # PESTAÑA 5: RANKING RFEA (ACTUALIZADA)
     with tab_rfea:
-        st.subheader("🇪🇸 Rankings Oficiales de la RFEA")
+        st.subheader("🏅 Rankings Oficiales de la RFEA")
         st.write("Consulta las marcas oficiales para compararte a nivel autonómico o nacional.")
         
        
