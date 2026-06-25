@@ -99,6 +99,14 @@ else:
         df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios", "tipo"])
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
 
+    # --- SOLUCIÓN AL ERROR DE EDICIÓN ---
+    # Forzamos estas columnas a tipo "object" (texto) para que Pandas no choque al editar
+    for col in ["usuario", "fecha", "prueba", "tipo", "comentarios"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].astype("object")
+    # ------------------------------------
+
     # ==========================================
     # MODO 1: SEGUIMIENTO DE MARCAS
     # ==========================================
