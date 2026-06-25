@@ -185,7 +185,7 @@ else:
     with tab_calendar:
         st.subheader("📅 Próximas Competiciones y Controles")
         
-        with St.expander("➕ Añadir Nueva Competición al Calendario"):
+        with st.expander("➕ Añadir Nueva Competición al Calendario"):
             with st.form("form_evento", clear_on_submit=True):
                 fech_ev = st.date_input("Fecha del Evento", datetime.date.today())
                 nomb_ev = st.text_input("Nombre de la Competición (Ej: Control Provincial, Cto Autonómico...)")
@@ -209,7 +209,6 @@ else:
                         st.rerun()
 
         if not df_competencias.empty:
-            # Aseguramos el orden cronológico
             df_competencias = df_competencias.sort_values(by="fecha", ascending=True)
             st.markdown("---")
             
@@ -219,14 +218,11 @@ else:
                 except:
                     f_formateada = row['fecha']
                 
-                # Caja contenedora para cada competición
                 with st.container():
-                    # Fila superior: Título y botones de acción a la derecha
                     col_tit, col_btn1, col_btn2 = st.columns([6, 1, 1])
                     with col_tit:
                         st.markdown(f"#### 🏟️ {row['nombre']}")
                     
-                    # Botón de Editar Competición
                     with col_btn1:
                         with st.popover("✏️"):
                             with st.form(f"edit_comp_{idx}"):
@@ -243,14 +239,12 @@ else:
                                     conn.update(worksheet="Competiciones", data=df_competencias)
                                     st.rerun()
                     
-                    # Botón de Borrar Competición
                     with col_btn2:
                         if st.button("🗑️", key=f"del_comp_{idx}"):
                             df_competencias_reducido = df_competencias.drop(idx).astype(str)
                             conn.update(worksheet="Competiciones", data=df_competencias_reducido)
                             st.rerun()
                     
-                    # Detalles de la competición
                     col_det1, col_det2 = st.columns(2)
                     with col_det1:
                         st.write(f"📅 **Fecha:** {f_formateada}")
