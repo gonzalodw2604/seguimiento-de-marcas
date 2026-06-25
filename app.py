@@ -39,7 +39,6 @@ def limpiar_comentarios(texto):
     return texto
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-# Usamos initial_sidebar_state="expanded" para intentar forzar que se abra
 st.set_page_config(
     page_title="BalasTeam - Gestión Atlética", 
     page_icon="🏃‍♂️", 
@@ -79,10 +78,10 @@ else:
     st.sidebar.title("☰ MENÚ PRINCIPAL")
     st.sidebar.markdown(f"👋 ¡Hola, **{st.session_state.usuario_actual.capitalize()}**!")
     
-    # Selector de modo principal
+    # Selector de modo principal (Añadimos la opción del Gym)
     modo_app = st.sidebar.radio(
         "🧭 Selecciona herramienta:",
-        ["📈 Seguimiento de Marcas", "💨 Calculadora de Viento"]
+        ["📈 Seguimiento de Marcas", "💨 Calculadora de Viento", "🏋️ Gimnasio (Fuerza y 1RM)"]
     )
     
     st.sidebar.markdown("---")
@@ -90,7 +89,6 @@ else:
         st.session_state.autenticado = False
         st.rerun()
     
-    # --- CHIVATO PARA MÓVILES EN LA PANTALLA PRINCIPAL ---
     st.info("👈 **Menú Lateral:** Toca el icono de la esquina superior izquierda ( **>** ) para cambiar de herramienta o cerrar sesión.")
 
     # Carga de datos base de marcas comunes
@@ -416,3 +414,53 @@ else:
                     if abs(n1 - n2) < 0.001: st.info("🤝 ¡Empate técnico absoluto!")
                     elif n1 < n2: st.success(f"👑 **¡Ganador: {nom1}!** Ventaja virtual de **{n2 - n1:.2f}s**.")
                     else: st.success(f"👑 **¡Ganador: {nom2}!** Ventaja virtual de **{n1 - n2:.2f}s**.")
+
+    # ==========================================
+    # MODO 3: GIMNASIO (Calculadora 1RM)
+    # ==========================================
+    elif modo_app == "🏋️ Gimnasio (Fuerza y 1RM)":
+        st.title("🏋️ Calculadora de Fuerza (1RM)")
+        st.write("Calcula tu Repetición Máxima (1RM) teórica basándote en lo que has levantado hoy y descubre exactamente qué peso poner en la barra según tu objetivo (Fuerza, Hipertrofia o Potencia).")
+
+        # Formulario de entrada
+        st.markdown("### ⚙️ Datos del Levantamiento")
+        col_gym1, col_gym2 = st.columns(2)
+        with col_gym1:
+            ejercicio = st.selectbox("Ejercicio:", ["Sentadilla Trasera", "Peso Muerto", "Press de Banca", "Cargada (Clean)", "Arrancada (Snatch)", "Hip Thrust", "Otro"])
+            peso_levantado = st.number_input("Peso levantado (kg):", min_value=0.0, step=2.5, value=80.0)
+        with col_gym2:
+            reps_realizadas = st.number_input("Repeticiones completadas:", min_value=1, max_value=20, step=1, value=5, help="Si haces más de 12 reps, el cálculo del 1RM pierde precisión.")
+        
+        if st.button("🔥 Calcular mi 1RM", type="primary", use_container_width=True):
+            if reps_realizadas == 1:
+                rm_calculado = peso_levantado
+            else:
+                # Usamos un promedio de las dos fórmulas biomecánicas más famosas (Epley y Brzycki) para mayor precisión
+                epley = peso_levantado * (1 + 0.0333 * reps_realizadas)
+                brzycki = peso_levantado * (36 / (37 - reps_realizadas))
+                rm_calculado = (epley + brzycki) / 2
+
+            st.markdown("---")
+            st.markdown(f"<h2 style='text-align: center; color: #FF4B4B;'>🏆 Tu 1RM en {ejercicio} es: {rm_calculado:.1f} kg</h2>", unsafe_allow_html=True)
+            st.markdown("---")
+
+            # Generación de la tabla de porcentajes
+            st.subheader("📊 Zonas de Entrenamiento (Calculadas sobre tu 1RM)")
+            st.write("Usa esta tabla para saber cuánto peso cargar en la barra según lo que toque entrenar hoy:")
+
+            zonas = [
+                {"Porcentaje": "100%", "Carga en Barra": f"{rm_calculado:.1f} kg", "Enfoque": "Fuerza Máxima (1 rep)"},
+                {"Porcentaje": "95%", "Carga en Barra": f"{rm_calculado * 0.95:.1f} kg", "Enfoque": "Fuerza Máxima (2 a 3 reps)"},
+                {"Porcentaje": "90%", "Carga en Barra": f"{rm_calculado * 0.90:.1f} kg", "Enfoque": "Fuerza Máxima (3 a 4 reps)"},
+                {"Porcentaje": "85%", "Carga en Barra": f"{rm_calculado * 0.85:.1f} kg", "Enfoque": "Fuerza / Hipertrofia (5 a 6 reps)"},
+                {"Porcentaje": "80%", "Carga en Barra": f"{rm_calculado * 0.80:.1f} kg", "Enfoque": "Hipertrofia Estructural (7 a 8 reps)"},
+                {"Porcentaje": "75%", "Carga en Barra": f"{rm_calculado * 0.75:.1f} kg", "Enfoque": "Hipertrofia Básica (9 a 10 reps)"},
+                {"Porcentaje": "70%", "Carga en Barra": f"{rm_calculado * 0.70:.1f} kg", "Enfoque": "Hipertrofia / Resistencia (11 a 12 reps)"},
+                {"Porcentaje": "60%", "Carga en Barra": f"{rm_calculado * 0.60:.1f} kg", "Enfoque": "Potencia / Explosividad (Velocidad)"},
+                {"Porcentaje": "50%", "Carga en Barra": f"{rm_calculado * 0.50:.1f} kg", "Enfoque": "Calentamiento Rápido / Recuperación"}
+            ]
+
+            df_zonas = pd.DataFrame(zonas)
+            st.dataframe(df_zonas, use_container_width=True, hide_index=True)
+            
+            st.info("💡 **Consejo para atletas:** Los velocistas y saltadores suelen trabajar mucho en la zona de **Potencia (60%)** moviendo la barra a máxima velocidad, y en **Fuerza Máxima (85-95%)** para reclutar unidades motoras sin ganar exceso de masa muscular.")
