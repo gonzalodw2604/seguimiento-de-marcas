@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import altair as alt
 from streamlit_gsheets import GSheetsConnection
+import streamlit.components.v1 as components  # Nueva importación para incrustar webs
 
 # --- ESCUDO ANTI-ERRORES ---
 def limpiar_comentarios(texto):
@@ -82,7 +83,12 @@ else:
     ]
     
     # --- CREACIÓN DE PESTAÑAS (TABS) ---
-    tab_perfil, tab_leaderboard, tab_calendar = st.tabs(["📊 Mi Perfil y Progreso", "🏆 Clasificación del Club", "📅 Calendario del Club"])
+    tab_perfil, tab_leaderboard, tab_calendar, tab_faa = st.tabs([
+        "📊 Mi Perfil y Progreso", 
+        "🏆 Clasificación", 
+        "📅 Competiciones BalasTeam",
+        "🌐 Calendario FAA"
+    ])
     
     # PESTAÑA 1: PERFIL PERSONAL
     with tab_perfil:
@@ -154,7 +160,7 @@ else:
 
     # PESTAÑA 2: RANKING DEL CLUB
     with tab_leaderboard:
-        st.subheader("🏆 Ranking General del Club")
+        st.subheader("🏆 Ranking General del BalasTeam")
         p_leader = st.selectbox("Selecciona prueba para ver el ranking:", lista_pruebas, key="leader_prueba")
         df_p = df[df["prueba"] == p_leader].copy()
         
@@ -188,9 +194,9 @@ else:
         else:
             st.info("Ningún atleta ha registrado marcas en esta prueba todavía.")
 
-    # PESTAÑA 3: CALENDARIO COMÚN DEL CLUB
+    # PESTAÑA 3: CALENDARIO BALASTEAM
     with tab_calendar:
-        st.subheader("📅 Próximas Competiciones y Controles")
+        st.subheader("📅 Próximas Competiciones - BalasTeam")
         
         with st.expander("➕ Añadir Nueva Competición al Calendario"):
             with st.form("form_evento", clear_on_submit=True):
@@ -247,7 +253,6 @@ else:
                                     df_competencias.at[idx, 'nombre'] = str(n_nomb)
                                     df_competencias.at[idx, 'lugar'] = str(n_luga)
                                     df_competencias.at[idx, 'pruebas'] = str(n_prue)
-                                    # El creador original NO se toca, guardamos al modificador actual
                                     df_competencias.at[idx, 'modificador'] = st.session_state.usuario_actual
                                     df_competencias = df_competencias.astype(str)
                                     conn.update(worksheet="Competiciones", data=df_competencias)
@@ -265,7 +270,6 @@ else:
                         st.write(f"📍 **Lugar:** {row['lugar']}")
                     with col_det2:
                         st.write(f"🏃‍♂️ **Pruebas convocadas:** {row['pruebas']}")
-                        # Lógica de etiquetas de autoría
                         if modificador_formateado:
                             st.write(f"👤 **Creado por:** {creador_formateado} | ✏️ **Editado por:** {modificador_formateado}")
                         else:
@@ -275,3 +279,15 @@ else:
                     st.markdown("---")
         else:
             st.info("No hay competiciones registradas en el calendario. ¡Sé el primero en añadir una!")
+            
+    # PESTAÑA 4: CALENDARIO FAA (IFRAME)
+    with tab_faa:
+        st.subheader("🌐 Calendario Oficial de la FAA")
+        st.write("Navega por las competiciones oficiales de la Federación Andaluza de Atletismo directamente desde aquí.")
+        
+        # Incrustamos la web
+        components.iframe("https://web.faalive.com/Calendar", height=700, scrolling=True)
+        
+        # Añadimos un enlace de respaldo por si la web bloquea el iframe en ciertos navegadores
+        st.markdown("---")
+        st.markdown("👉 *Si no ves el calendario correctamente arriba, [haz clic aquí para abrirlo en una ventana nueva](https://web.faalive.com/Calendar).*")
