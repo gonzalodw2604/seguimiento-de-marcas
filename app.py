@@ -38,8 +38,14 @@ def limpiar_comentarios(texto):
         return "'" + texto
     return texto
 
-# Configuración única de la pestaña de la App
-st.set_page_config(page_title="BalasTeam - Gestión Atlética", page_icon="🏃‍♂️", layout="centered")
+# --- CONFIGURACIÓN DE PÁGINA ---
+# Usamos initial_sidebar_state="expanded" para intentar forzar que se abra
+st.set_page_config(
+    page_title="BalasTeam - Gestión Atlética", 
+    page_icon="🏃‍♂️", 
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
 
 # --- ESTADO Y CONEXIÓN ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
@@ -70,7 +76,8 @@ if not st.session_state.autenticado:
                 st.success("Creado")
 else:
     # --- MENÚ DE NAVEGACIÓN LATERAL (SIDEBAR) ---
-    st.sidebar.title(f"👋 ¡Hola, {st.session_state.usuario_actual.capitalize()}!")
+    st.sidebar.title("☰ MENÚ PRINCIPAL")
+    st.sidebar.markdown(f"👋 ¡Hola, **{st.session_state.usuario_actual.capitalize()}**!")
     
     # Selector de modo principal
     modo_app = st.sidebar.radio(
@@ -83,6 +90,9 @@ else:
         st.session_state.autenticado = False
         st.rerun()
     
+    # --- CHIVATO PARA MÓVILES EN LA PANTALLA PRINCIPAL ---
+    st.info("👈 **Menú Lateral:** Toca el icono de la esquina superior izquierda ( **>** ) para cambiar de herramienta o cerrar sesión.")
+
     # Carga de datos base de marcas comunes
     try:
         df = conn.read(worksheet="Hoja 1", ttl=0).dropna(how="all", subset=["usuario", "fecha", "prueba", "marca"])
