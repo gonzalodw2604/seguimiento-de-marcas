@@ -293,7 +293,7 @@ else:
         st.subheader("🇪🇸 Rankings Oficiales de la RFEA")
         st.write("Consulta las marcas oficiales para compararte a nivel autonómico o nacional.")
         
-        st.info("ℹ️ La RFEA bloquea por seguridad que su web se vea incrustada en otras aplicaciones. ¡Pero tienes acceso directo desde aquí!")
+       
         
         st.write("Selecciona qué ranking quieres consultar:")
         
