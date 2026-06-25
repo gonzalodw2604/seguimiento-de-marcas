@@ -52,42 +52,28 @@ if "usuario_actual" not in st.session_state: st.session_state.usuario_actual = "
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- AUTENTICACIÓN ---
-
-    # --- AUTENTICACIÓN REFORZADA ---
 if not st.session_state.autenticado:
     st.title("🏃‍♂️ Acceso al Club")
     try:
-        # Leemos la hoja forzando que todo sea texto plano
-        df_usuarios = conn.read(worksheet="Usuarios", ttl=0).astype(str)
-        
-        # Limpiamos espacios y minúsculas para que no haya fallos
-        df_usuarios["usuario"] = df_usuarios["usuario"].str.lower().str.strip()
-        df_usuarios["contrasena"] = df_usuarios["contrasena"].str.strip()
-        
-        # Creamos el diccionario asegurándonos de que son strings puras
-        dict_usuarios = dict(zip(df_usuarios["usuario"], df_usuarios["contrasena"]))
-    except Exception as e:
-        st.error(f"Error de conexión: {e}")
-        dict_usuarios = {}
+        df_usuarios = conn.read(worksheet="Usuarios", ttl=0)
+        dict_usuarios = dict(zip(df_usuarios["usuario"].str.lower().str.strip(), df_usuarios["contrasena"].str.strip()))
+    except: dict_usuarios = {}
 
     tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Registro"])
     with tab_login:
         with st.form("login"):
             u = st.text_input("Usuario").lower().strip()
-            p = st.text_input("Contraseña", type="password").strip()
-            
-            if st.form_submit_button("Entrar"):
-                # Debugging visual: ¿Qué ve realmente la app al entrar?
-                if u in dict_usuarios:
-                    if dict_usuarios[u] == p:
-                        st.session_state.autenticado = True
-                        st.session_state.usuario_actual = u
-                        st.rerun()
-                    else:
-                        st.error("❌ Contraseña incorrecta.")
-                else:
-                    st.error("❌ Usuario no encontrado.")
-                    st.write(f"DEBUG: Usuarios cargados en memoria: {list(dict_usuarios.keys())}")
+            p = st.text_input("Contraseña", type="password")
+            if st.form_submit_button("Entrar") and u in dict_usuarios and dict_usuarios[u] == p:
+                st.session_state.autenticado = True; st.session_state.usuario_actual = u; st.rerun()
+    with tab_registro:
+        with st.form("registro"):
+            u = st.text_input("Nuevo Usuario").lower().strip()
+            p = st.text_input("Nueva Contraseña", type="password")
+            if st.form_submit_button("Crear") and u not in dict_usuarios:
+                conn.update(worksheet="Usuarios", data=pd.concat([df_usuarios, pd.DataFrame([{"usuario": u, "contrasena": p}])]))
+                st.success("Creado")
+else:
     # --- MENÚ DE NAVEGACIÓN LATERAL (SIDEBAR) ---
     st.sidebar.title("☰ MENÚ PRINCIPAL")
     st.sidebar.markdown(f"👋 ¡Hola, **{st.session_state.usuario_actual.capitalize()}**!")
