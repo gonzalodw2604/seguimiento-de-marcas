@@ -60,7 +60,14 @@ else:
     try:
         df_competencias = conn.read(worksheet="Competiciones", ttl=0).dropna(how="all", subset=["fecha", "nombre"])
     except:
-        df_competencias = pd.DataFrame(columns=["fecha", "nombre", "lugar", "pruebas"])
+        df_competencias = pd.DataFrame(columns=["fecha", "nombre", "lugar", "pruebas", "creador", "modificador"])
+
+    if "creador" not in df_competencias.columns: df_competencias["creador"] = "Anónimo"
+    if "modificador" not in df_competencias.columns: df_competencias["modificador"] = ""
+
+    # Rellenar nulos para evitar errores visuales
+    df_competencias["creador"] = df_competencias["creador"].fillna("Anónimo")
+    df_competencias["modificador"] = df_competencias["modificador"].fillna("")
 
     # --- LISTA DE PRUEBAS ---
     lista_pruebas = [
@@ -188,9 +195,9 @@ else:
         with st.expander("➕ Añadir Nueva Competición al Calendario"):
             with st.form("form_evento", clear_on_submit=True):
                 fech_ev = st.date_input("Fecha del Evento", datetime.date.today())
-                nomb_ev = st.text_input("Nombre de la Competición (Ej: Control Provincial, Cto Autonómico...)")
-                luga_ev = st.text_input("Lugar / Pista (Ej: Pistas Gaetá Huguet, Valencia...)")
-                prue_ev = st.text_input("Pruebas disponibles o convocadas (Ej: 100m, Longitud, 1500m...)")
+                nomb_ev = st.text_input("Nombre de la Competición")
+                luga_ev = st.text_input("Lugar / Pista")
+                prue_ev = st.text_input("Pruebas convocadas")
                 
                 if st.form_submit_button("Publicar Competición"):
                     if nomb_ev.strip() == "":
@@ -200,7 +207,9 @@ else:
                             "fecha": fech_ev.strftime("%Y-%m-%d"),
                             "nombre": str(nomb_ev),
                             "lugar": str(luga_ev),
-                            "pruebas": str(prue_ev)
+                            "pruebas": str(prue_ev),
+                            "creador": st.session_state.usuario_actual,
+                            "modificador": ""  # Inicialmente no tiene modificaciones
                         }])
                         df_competencias_actualizado = pd.concat([df_competencias, nuevo_evento], ignore_index=True)
                         df_competencias_actualizado = df_competencias_actualizado.astype(str)
@@ -217,6 +226,9 @@ else:
                     f_formateada = pd.to_datetime(row['fecha']).strftime("%d/%m/%Y")
                 except:
                     f_formateada = row['fecha']
+                
+                creador_formateado = str(row['creador']).capitalize()
+                modificador_formateado = str(row['modificador']).capitalize() if str(row['modificador']).strip() != "" else None
                 
                 with st.container():
                     col_tit, col_btn1, col_btn2 = st.columns([6, 1, 1])
@@ -235,6 +247,8 @@ else:
                                     df_competencias.at[idx, 'nombre'] = str(n_nomb)
                                     df_competencias.at[idx, 'lugar'] = str(n_luga)
                                     df_competencias.at[idx, 'pruebas'] = str(n_prue)
+                                    # El creador original NO se toca, guardamos al modificador actual
+                                    df_competencias.at[idx, 'modificador'] = st.session_state.usuario_actual
                                     df_competencias = df_competencias.astype(str)
                                     conn.update(worksheet="Competiciones", data=df_competencias)
                                     st.rerun()
@@ -251,6 +265,11 @@ else:
                         st.write(f"📍 **Lugar:** {row['lugar']}")
                     with col_det2:
                         st.write(f"🏃‍♂️ **Pruebas convocadas:** {row['pruebas']}")
+                        # Lógica de etiquetas de autoría
+                        if modificador_formateado:
+                            st.write(f"👤 **Creado por:** {creador_formateado} | ✏️ **Editado por:** {modificador_formateado}")
+                        else:
+                            st.write(f"👤 **Publicado por:** {creador_formateado}")
                     
                     st.markdown(" ")
                     st.markdown("---")
