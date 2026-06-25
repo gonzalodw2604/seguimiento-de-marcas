@@ -56,6 +56,12 @@ else:
         df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios", "tipo"])
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
 
+    # Base de datos para el Calendario Común
+    try:
+        df_competencias = conn.read(worksheet="Competiciones", ttl=0).dropna(how="all", subset=["fecha", "nombre"])
+    except:
+        df_competencias = pd.DataFrame(columns=["fecha", "nombre", "lugar", "pruebas"])
+
     # --- LISTA DE PRUEBAS ---
     lista_pruebas = [
         "100m lisos", 
@@ -69,10 +75,10 @@ else:
     ]
     
     # --- CREACIÓN DE PESTAÑAS (TABS) ---
-    tab_perfil, tab_leaderboard = st.tabs(["📊 Mi Perfil y Progreso", "🏆 Clasificación del Club"])
+    tab_perfil, tab_leaderboard, tab_calendar = st.tabs(["📊 Mi Perfil y Progreso", "🏆 Clasificación del Club", "📅 Calendario del Club"])
     
+    # PESTAÑA 1: PERFIL PERSONAL
     with tab_perfil:
-        # Formularios
         col1, col2 = st.columns(2)
         with col1:
             with st.form("form_m", clear_on_submit=True):
@@ -87,10 +93,9 @@ else:
                 po, mo = st.selectbox("Prueba", lista_pruebas), st.number_input("Objetivo", format="%.2f")
                 if st.form_submit_button("Guardar Objetivo"):
                     d_r = df_objetivos[~((df_objetivos["usuario"] == st.session_state.usuario_actual) & (df_objetivos["prueba"] == po))]
-                    conn.update(worksheet="Objetivos", data=pd.concat([d_r, pd.DataFrame([{"usuario": st.session_state.usuario_actual, "prueba": po, "objective": mo}])]))
+                    conn.update(worksheet="Objetivos", data=pd.concat([d_r, pd.DataFrame([{"usuario": st.session_state.usuario_actual, "prueba": po, "objetivo": mo}])]))
                     st.rerun()
 
-        # Análisis Personal
         st.subheader("📈 Mi Progreso")
         df_u = df[df["usuario"] == st.session_state.usuario_actual].copy()
         p_sel = st.selectbox("Selecciona prueba para analizar:", lista_pruebas, key="perfil_prueba")
@@ -105,7 +110,6 @@ else:
         if not df_g.empty:
             mejor = df_g["marca"].max() if es_salto else df_g["marca"].min()
             
-            # Bloque de Métricas
             col_m1, col_m2, col_m3 = st.columns(3)
             col_m1.metric("🏅 Récord Personal", mejor)
             if meta_val:
@@ -113,12 +117,10 @@ else:
                 distancia = round(abs(mejor - meta_val), 2)
                 col_m3.metric("📏 Metros a mejorar" if es_salto else "⏱️ Tiempo a bajar", f"{distancia} {'m' if es_salto else 'seg'}")
             
-            # Gráfica
             c = alt.Chart(df_g).mark_line(point=True).encode(x="fecha:T", y="marca:Q", color="tipo:N", tooltip=["fecha","marca","tipo","comentarios"])
             if meta_val: st.altair_chart(alt.layer(c, alt.Chart(pd.DataFrame({'o':[meta_val]})).mark_rule(color='red', strokeDash=[5,5]).encode(y='o:Q')).interactive(), use_container_width=True)
             else: st.altair_chart(c.interactive(), use_container_width=True)
 
-        # Lista con Edición Completa y Segura
         st.markdown("### 📋 Tus registros")
         for idx, row in df_u[df_u["prueba"] == p_sel].iterrows():
             c1, c2, c3 = st.columns([4, 1, 1])
@@ -143,17 +145,14 @@ else:
                 conn.update(worksheet="Hoja 1", data=df.drop(idx))
                 st.rerun()
 
+    # PESTAÑA 2: RANKING DEL CLUB
     with tab_leaderboard:
         st.subheader("🏆 Ranking General del Club")
         p_leader = st.selectbox("Selecciona prueba para ver el ranking:", lista_pruebas, key="leader_prueba")
-        
-        # Filtrar marcas globales de la prueba seleccionada
         df_p = df[df["prueba"] == p_leader].copy()
         
         if not df_p.empty:
             es_salto_leader = "Salto" in p_leader or "Triple" in p_leader or "Pértiga" in p_leader
-            
-            # Encontrar el récord personal absoluto de cada atleta único en esa prueba
             if es_salto_leader:
                 leaderboard = df_p.groupby("usuario")["marca"].max().reset_index()
                 leaderboard = leaderboard.sort_values(by="marca", ascending=False).reset_index(drop=True)
@@ -161,19 +160,14 @@ else:
                 leaderboard = df_p.groupby("usuario")["marca"].min().reset_index()
                 leaderboard = leaderboard.sort_values(by="marca", ascending=True).reset_index(drop=True)
             
-            # Añadir columna de Posición / Puesto
             leaderboard.index = leaderboard.index + 1
             leaderboard.index.name = "Puesto"
-            
-            # Embellecer nombres de columnas y visualización
             leaderboard.columns = ["Atleta", "Mejor Marca"]
             leaderboard["Atleta"] = leaderboard["Atleta"].str.capitalize()
             
-            # Dar formato de unidad (m o seg)
             unidad = "m" if es_salto_leader else "seg"
             leaderboard["Mejor Marca"] = leaderboard["Mejor Marca"].apply(lambda x: f"{x:.2f} {unidad}")
             
-            # Emojis especiales para el podio
             def asignar_medalla(pos):
                 if pos == 1: return "🥇"
                 elif pos == 2: return "🥈"
@@ -183,8 +177,59 @@ else:
             leaderboard_display = leaderboard.copy()
             leaderboard_display["Puesto"] = [asignar_medalla(i) for i in leaderboard_display.index]
             leaderboard_display = leaderboard_display.set_index("Puesto")
-            
-            # Mostrar la tabla elegante
             st.dataframe(leaderboard_display, use_container_width=True)
         else:
             st.info("Ningún atleta ha registrado marcas en esta prueba todavía.")
+
+    # PESTAÑA 3: CALENDARIO COMÚN DEL CLUB
+    with tab_calendar:
+        st.subheader("📅 Próximas Competiciones y Controles")
+        
+        # Formulario público para añadir eventos
+        with st.expander("➕ Añadir Nueva Competición al Calendario"):
+            with st.form("form_evento", clear_on_submit=True):
+                fech_ev = st.date_input("Fecha del Evento", datetime.date.today())
+                nomb_ev = st.text_input("Nombre de la Competición (Ej: Control Provincial, Cto Autonómico...)")
+                luga_ev = st.text_input("Lugar / Pista (Ej: Pistas Gaetá Huguet, Valencia...)")
+                prue_ev = st.text_input("Pruebas disponibles o convocadas (Ej: 100m, Longitud, 1500m...)")
+                
+                if st.form_submit_button("Publicar Competición"):
+                    if nomb_ev.strip() == "":
+                        st.error("Por favor, introduce el nombre del evento.")
+                    else:
+                        nuevo_evento = pd.DataFrame([{
+                            "fecha": fech_ev.strftime("%Y-%m-%d"),
+                            "nombre": nomb_ev,
+                            "lugar": luga_ev,
+                            "pruebas": prue_ev
+                        }])
+                        df_competencias_actualizado = pd.concat([df_competencias, nuevo_evento], ignore_index=True)
+                        conn.update(worksheet="Competiciones", data=df_competencias_actualizado)
+                        st.success("¡Competición añadida con éxito!")
+                        st.rerun()
+
+        # Mostrar la lista de competiciones
+        if not df_competencias.empty:
+            # Ordenar por fecha (las más próximas primero)
+            df_competencias_ordenado = df_competencias.sort_values(by="fecha", ascending=True)
+            
+            st.markdown("---")
+            for idx, row in df_competencias_ordenado.iterrows():
+                # Dar un formato visual bonito a cada evento usando columnas y markdown
+                try:
+                    f_formateada = pd.to_datetime(row['fecha']).strftime("%d/%m/%Y")
+                except:
+                    f_formateada = row['fecha']
+                
+                with st.container():
+                    st.markdown(f"#### 🏟️ {row['nombre']}")
+                    col_det1, col_det2 = st.columns(2)
+                    with col_det1:
+                        st.write(f"📅 **Fecha:** {f_formateada}")
+                        st.write(f"📍 **Lugar:** {row['lugar']}")
+                    with col_det2:
+                        st.write(f"🏃‍♂️ **Pruebas convocadas:** {row['pruebas']}")
+                    st.markdown(" ") # Espaciador visual limpio
+                    st.markdown("---")
+        else:
+            st.info("No hay competiciones registradas en el calendario. ¡Sé el primero en añadir una!")
