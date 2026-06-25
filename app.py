@@ -185,7 +185,6 @@ else:
     with tab_calendar:
         st.subheader("📅 Próximas Competiciones y Controles")
         
-        # Formulario público para añadir eventos
         with st.expander("➕ Añadir Nueva Competición al Calendario"):
             with st.form("form_evento", clear_on_submit=True):
                 fech_ev = st.date_input("Fecha del Evento", datetime.date.today())
@@ -199,23 +198,21 @@ else:
                     else:
                         nuevo_evento = pd.DataFrame([{
                             "fecha": fech_ev.strftime("%Y-%m-%d"),
-                            "nombre": nomb_ev,
-                            "lugar": luga_ev,
-                            "pruebas": prue_ev
+                            "nombre": str(nomb_ev),
+                            "lugar": str(luga_ev),
+                            "pruebas": str(prue_ev)
                         }])
                         df_competencias_actualizado = pd.concat([df_competencias, nuevo_evento], ignore_index=True)
+                        # Asegurar tipos string para prevenir bloqueos de gsheets
+                        df_competencias_actualizado = df_competencias_actualizado.astype(str)
                         conn.update(worksheet="Competiciones", data=df_competencias_actualizado)
                         st.success("¡Competición añadida con éxito!")
                         st.rerun()
 
-        # Mostrar la lista de competiciones
         if not df_competencias.empty:
-            # Ordenar por fecha (las más próximas primero)
             df_competencias_ordenado = df_competencias.sort_values(by="fecha", ascending=True)
-            
             st.markdown("---")
             for idx, row in df_competencias_ordenado.iterrows():
-                # Dar un formato visual bonito a cada evento usando columnas y markdown
                 try:
                     f_formateada = pd.to_datetime(row['fecha']).strftime("%d/%m/%Y")
                 except:
@@ -229,7 +226,7 @@ else:
                         st.write(f"📍 **Lugar:** {row['lugar']}")
                     with col_det2:
                         st.write(f"🏃‍♂️ **Pruebas convocadas:** {row['pruebas']}")
-                    st.markdown(" ") # Espaciador visual limpio
+                    st.markdown(" ")
                     st.markdown("---")
         else:
             st.info("No hay competiciones registradas en el calendario. ¡Sé el primero en añadir una!")
