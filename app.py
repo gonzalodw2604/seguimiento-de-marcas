@@ -14,7 +14,7 @@ def limpiar_comentarios(texto):
 # Configuración
 st.set_page_config(page_title="Control de Marcas", layout="centered")
 
-# --- ESTADO AND CONEXIÓN ---
+# --- ESTADO Y CONEXIÓN ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_actual" not in st.session_state: st.session_state.usuario_actual = ""
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -56,7 +56,17 @@ else:
         df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios", "tipo"])
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
 
-    lista_pruebas = ["100m lisos", "200m lisos", "400m lisos", "800m lisos", "Salto de Longitud", "Triple Salto"]
+    # --- LISTA DE PRUEBAS ACTUALIZADA ---
+    lista_pruebas = [
+        "100m lisos", 
+        "200m lisos", 
+        "400m lisos", 
+        "800m lisos", 
+        "1500m lisos", 
+        "Salto de Longitud", 
+        "Triple Salto", 
+        "Salto con Pértiga"
+    ]
     
     # --- CREACIÓN DE PESTAÑAS (TABS) ---
     tab_perfil, tab_leaderboard = st.tabs(["📊 Mi Perfil y Progreso", "🏆 Clasificación del Club"])
@@ -90,7 +100,8 @@ else:
         meta = df_objetivos[(df_objetivos["usuario"]==st.session_state.usuario_actual) & (df_objetivos["prueba"]==p_sel)]
         meta_val = meta.iloc[0]["objetivo"] if not meta.empty else None
         
-        es_salto = "Salto" in p_sel or "Triple" in p_sel
+        # Lógica para detectar si es un concurso de salto
+        es_salto = "Salto" in p_sel or "Triple" in p_sel or "Pértiga" in p_sel
         
         if not df_g.empty:
             mejor = df_g["marca"].max() if es_salto else df_g["marca"].min()
@@ -141,7 +152,7 @@ else:
         df_p = df[df["prueba"] == p_leader].copy()
         
         if not df_p.empty:
-            es_salto_leader = "Salto" in p_leader or "Triple" in p_leader
+            es_salto_leader = "Salto" in p_leader or "Triple" in p_leader or "Pértiga" in p_leader
             
             # Encontrar el récord personal absoluto de cada atleta único en esa prueba
             if es_salto_leader:
@@ -151,32 +162,4 @@ else:
             else:
                 # Si es carrera, queremos el mínimo (el tiempo más bajo)
                 leaderboard = df_p.groupby("usuario")["marca"].min().reset_index()
-                leaderboard = leaderboard.sort_values(by="marca", ascending=True).reset_index(drop=True)
-            
-            # Añadir columna de Posición / Puesto
-            leaderboard.index = leaderboard.index + 1
-            leaderboard.index.name = "Puesto"
-            
-            # Embellecer nombres de columnas y visualización
-            leaderboard.columns = ["Atleta", "Mejor Marca"]
-            leaderboard["Atleta"] = leaderboard["Atleta"].str.capitalize()
-            
-            # Dar formato de unidad (m o seg)
-            unidad = "m" if es_salto_leader else "seg"
-            leaderboard["Mejor Marca"] = leaderboard["Mejor Marca"].apply(lambda x: f"{x:.2f} {unidad}")
-            
-            # Emojis especiales para el podio
-            def asignar_medalla(pos):
-                if pos == 1: return "🥇"
-                elif pos == 2: return "🥈"
-                elif pos == 3: return "🥉"
-                return f"{pos}º"
-            
-            leaderboard_display = leaderboard.copy()
-            leaderboard_display["Puesto"] = [asignar_medalla(i) for i in leaderboard_display.index]
-            leaderboard_display = leaderboard_display.set_index("Puesto")
-            
-            # Mostrar la tabla elegante
-            st.dataframe(leaderboard_display, use_container_width=True)
-        else:
-            st.info("Ningún atleta ha registrado marcas en esta prueba todavía.")
+                leaderboard = leaderboard.
