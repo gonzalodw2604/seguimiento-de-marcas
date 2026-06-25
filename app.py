@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import altair as alt
 from streamlit_gsheets import GSheetsConnection
-import streamlit.components.v1 as components  # Nueva importación para incrustar webs
+import streamlit.components.v1 as components
 
 # --- ESCUDO ANTI-ERRORES ---
 def limpiar_comentarios(texto):
@@ -83,11 +83,12 @@ else:
     ]
     
     # --- CREACIÓN DE PESTAÑAS (TABS) ---
-    tab_perfil, tab_leaderboard, tab_calendar, tab_faa = st.tabs([
-        "📊 Mi Perfil y Progreso", 
+    tab_perfil, tab_leaderboard, tab_calendar, tab_faa, tab_rfea = st.tabs([
+        "📊 Mi Perfil", 
         "🏆 Clasificación", 
-        "📅 Competiciones BalasTeam",
-        "🌐 Calendario FAA"
+        "📅 BalasTeam",
+        "🌐 Calendario FAA",
+        "🇪🇸 Ranking RFEA"
     ])
     
     # PESTAÑA 1: PERFIL PERSONAL
@@ -215,7 +216,7 @@ else:
                             "lugar": str(luga_ev),
                             "pruebas": str(prue_ev),
                             "creador": st.session_state.usuario_actual,
-                            "modificador": ""  # Inicialmente no tiene modificaciones
+                            "modificador": ""
                         }])
                         df_competencias_actualizado = pd.concat([df_competencias, nuevo_evento], ignore_index=True)
                         df_competencias_actualizado = df_competencias_actualizado.astype(str)
@@ -284,10 +285,24 @@ else:
     with tab_faa:
         st.subheader("🌐 Calendario Oficial de la FAA")
         st.write("Navega por las competiciones oficiales de la Federación Andaluza de Atletismo directamente desde aquí.")
-        
-        # Incrustamos la web
         components.iframe("https://web.faalive.com/Calendar", height=700, scrolling=True)
+        st.markdown("👉 *Si no ves el calendario correctamente, [ábrelo en una ventana nueva](https://web.faalive.com/Calendar).*")
+
+    # PESTAÑA 5: RANKING RFEA
+    with tab_rfea:
+        st.subheader("🇪🇸 Rankings Oficiales de la RFEA")
+        st.write("Consulta las marcas oficiales para compararte a nivel autonómico o nacional.")
         
-        # Añadimos un enlace de respaldo por si la web bloquea el iframe en ciertos navegadores
-        st.markdown("---")
-        st.markdown("👉 *Si no ves el calendario correctamente arriba, [haz clic aquí para abrirlo en una ventana nueva](https://web.faalive.com/Calendar).*")
+        # Desplegable para seleccionar la zona
+        opcion_ranking = st.selectbox(
+            "📍 Selecciona el ámbito del ranking:",
+            ["Ranking Andaluz", "Ranking Nacional (España)"]
+        )
+        
+        # Lógica para cambiar el iframe según el desplegable
+        if opcion_ranking == "Ranking Andaluz":
+            components.iframe("https://atletismorfea.es/federaciones/ranking/and", height=800, scrolling=True)
+            st.markdown("👉 *Si no carga, [haz clic aquí para abrir el Ranking Andaluz en otra pestaña](https://atletismorfea.es/federaciones/ranking/and).*")
+        else:
+            components.iframe("https://atletismorfea.es/ranking", height=800, scrolling=True)
+            st.markdown("👉 *Si no carga, [haz clic aquí para abrir el Ranking Nacional en otra pestaña](https://atletismorfea.es/ranking).*")
