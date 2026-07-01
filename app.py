@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import time
 import altair as alt
 from streamlit_gsheets import GSheetsConnection
 import streamlit.components.v1 as components
+from streamlit_cookies_controller import CookieController
 
 # ==========================================
 # BASE DE DATOS Y FUNCIONES GLOBALES
@@ -46,9 +48,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- CONTROLADOR DE COOKIES ---
+controller = CookieController()
+
 # --- ESTADO Y CONEXIÓN ---
 if "autenticado" not in st.session_state: st.session_state.autenticado = False
 if "usuario_actual" not in st.session_state: st.session_state.usuario_actual = ""
+
+# Auto-login: Detectar si el usuario ya guardó su sesión antes
+usuario_guardado = controller.get('balasteam_user')
+if usuario_guardado and not st.session_state.autenticado:
+    st.session_state.autenticado = True
+    st.session_state.usuario_actual = usuario_guardado
+
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- AUTENTICACIÓN ---
@@ -56,7 +68,7 @@ if not st.session_state.autenticado:
     st.title("🏃‍♂️ Acceso al Club")
     try:
         df_usuarios = conn.read(worksheet="Usuarios", ttl=0)
-        dict_usuarios = dict(zip(df_usuarios["usuario"].str.lower().str.strip(), df_usuarios["contrasena"].str.strip()))
+        dict_usuarios = dict(zip(df_usuarios["usuario"].astype(str).str.lower().str.strip(), df_usuarios["contrasena"].astype(str).str.strip()))
     except: dict_usuarios = {}
 
     tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Registro"])
@@ -64,8 +76,23 @@ if not st.session_state.autenticado:
         with st.form("login"):
             u = st.text_input("Usuario").lower().strip()
             p = st.text_input("Contraseña", type="password")
-            if st.form_submit_button("Entrar") and u in dict_usuarios and dict_usuarios[u] == p:
-                st.session_state.autenticado = True; st.session_state.usuario_actual = u; st.rerun()
+            
+            # NUEVO: Casilla para recordar la sesión
+            recordar = st.checkbox("Recordar mi sesión (30 días)")
+            
+            enviado = st.form_submit_button("Entrar")
+            if enviado:
+                if u in dict_usuarios and dict_usuarios[u] == p:
+                    if recordar:
+                        # Guardamos la cookie por 2592000 segundos (30 días)
+                        controller.set('balasteam_user', u, max_age=2592000)
+                        time.sleep(0.5) # Pausa breve para que el navegador guarde la cookie bien
+                        
+                    st.session_state.autenticado = True
+                    st.session_state.usuario_actual = u
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña incorrectos.")
     with tab_registro:
         with st.form("registro"):
             u = st.text_input("Nuevo Usuario").lower().strip()
@@ -86,6 +113,9 @@ else:
     
     st.sidebar.markdown("---")
     if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True): 
+        # Si cierra sesión, borramos la cookie para que le vuelva a pedir login
+        controller.remove('balasteam_user')
+        time.sleep(0.5)
         st.session_state.autenticado = False
         st.rerun()
     
@@ -99,13 +129,11 @@ else:
         df = pd.DataFrame(columns=["usuario", "fecha", "prueba", "marca", "comentarios", "tipo"])
         df_objetivos = pd.DataFrame(columns=["usuario", "prueba", "objetivo"])
 
-    # --- SOLUCIÓN AL ERROR DE EDICIÓN ---
     # Forzamos estas columnas a tipo "object" (texto) para que Pandas no choque al editar
     for col in ["usuario", "fecha", "prueba", "tipo", "comentarios"]:
         if col not in df.columns:
             df[col] = ""
         df[col] = df[col].astype("object")
-    # ------------------------------------
 
     # ==========================================
     # MODO 1: SEGUIMIENTO DE MARCAS
